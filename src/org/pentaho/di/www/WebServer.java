@@ -85,7 +85,7 @@ public class WebServer
     public void startServer() throws Exception
     {
         server = new Server();
-
+        /*
         Constraint constraint = new Constraint();
         constraint.setName(Constraint.__BASIC_AUTH);;
         constraint.setRoles( new String[] { Constraint.ANY_ROLE } );
@@ -94,7 +94,7 @@ public class WebServer
         ConstraintMapping constraintMapping = new ConstraintMapping();
         constraintMapping.setConstraint(constraint);
         constraintMapping.setPathSpec("/*");
-
+        
         // Set up the security handler, optionally with JAAS
         //
         SecurityHandler securityHandler = new SecurityHandler();
@@ -115,7 +115,7 @@ public class WebServer
         }
         
         securityHandler.setConstraintMappings(new ConstraintMapping[]{constraintMapping});
-               
+        */
         // Add all the servlets...
         //
         ContextHandlerCollection contexts = new ContextHandlerCollection();
@@ -236,7 +236,7 @@ public class WebServer
         
         
 
-        server.setHandlers(new Handler[] { securityHandler, contexts });
+        server.setHandlers(new Handler[] { contexts });
 
         // Start execution
         createListeners();
