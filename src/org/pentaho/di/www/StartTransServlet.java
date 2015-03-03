@@ -12,128 +12,274 @@
 */
 package org.pentaho.di.www;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URLEncoder;
 
+import javax.mail.Part;
+import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.pentaho.di.core.Const;
+import org.pentaho.di.core.exception.KettleException;
+import org.pentaho.di.core.exception.KettleStepException;
+import org.pentaho.di.core.exception.KettleXMLException;
+import org.pentaho.di.core.geospatial.SRS;
 import org.pentaho.di.core.logging.Log4jStringAppender;
 import org.pentaho.di.core.logging.LogWriter;
 import org.pentaho.di.core.xml.XMLHandler;
 import org.pentaho.di.trans.Trans;
+import org.pentaho.di.trans.TransHopMeta;
+import org.pentaho.di.trans.TransMeta;
+import org.pentaho.di.trans.step.StepMeta;
+import org.pentaho.di.trans.step.StepMetaInterface;
+import org.pentaho.di.trans.steps.gisfileinput.GISFileInputMeta;
+import org.pentaho.di.trans.steps.gisfileoutput.GISFileOutputMeta;
+import org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta;
+import org.pentaho.di.trans.steps.gmlfileoutput.GMLFileOutputMeta;
+import org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta;
+import org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta;
+import org.pentaho.di.trans.steps.srstransformation.SRSList;
+import org.pentaho.di.trans.steps.srstransformation.SRSTransformationMeta;
+import org.pentaho.di.trans.steps.srstransformation.SRSTransformator;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.vfs.FileObject;
 
+import javax.servlet.ServletOutputStream;
+
+import java.io.FileInputStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.pentaho.di.core.row.RowMetaInterface;
+import org.pentaho.di.core.variables.VariableSpace;
+import org.pentaho.di.core.variables.Variables;
+import org.pentaho.di.core.vfs.KettleVFS;
+
+import java.security.SecureRandom;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.math.BigInteger;
+
+import jdk.internal.util.xml.impl.Pair;
+
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
 public class StartTransServlet extends HttpServlet
 {
     private static final long serialVersionUID = -5879200987669847357L;
-    
     public static final String CONTEXT_PATH = "/kettle/startTrans";
     private static LogWriter log = LogWriter.getInstance();
-    private TransformationMap transformationMap;
+    
+    private static String[] basicFormats = {"gml", "shp", "kml"};
+    private static Map<String, String[]> supportingFormats = new HashMap<String, String[]>() 
+    {{
+    	put("shp", new String[] {"dbf", "shx"});
+    }};
+    private static Map<Integer, String> transFiles = new HashMap<Integer, String>() 
+    {{
+    	put(0, "srs.ktr");
+    }};
+    private static Map<String, String[]> fileMetaClasses = new HashMap<String, String[]>() 
+    {{
+    	put("gml", new String[] {"org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta",
+		 						"org.pentaho.di.trans.steps.gmlfileoutput.GMLFileOutputMeta"});
+    	put("shp", new String[] {"org.pentaho.di.trans.steps.gisfileinput.GISFileInputMeta",
+	 							"org.pentaho.di.trans.steps.gisfileoutput.GISFileOutputMeta"});
+    	put("kml", new String[] {"org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta",
+		 						"org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta"});
+    }};
+    
+    private static String tmpFilesDir = "tmp\\";
+    private static String transFilesDir = "dvo_trans\\";
+    private static String compressComand = "C:\\Program Files (x86)\\WinRAR\\rar.exe A -ep1 %sout %snew_*";
     
     public StartTransServlet(TransformationMap transformationMap)
     {
-        this.transformationMap = transformationMap;
     }
     
-    protected void doPut(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
-    {
-        doGet(request, response);
+	public String randomString() 
+	{
+	    return new BigInteger(130, new SecureRandom()).toString(32);
+	}
+	
+	public void deleteDirectory(File dir)
+	{
+        if (dir.isDirectory()) 
+        {
+            String[] children = dir.list();
+            for (int i = 0; i < children.length; ++i) 
+            {
+                File f = new File(dir, children[i]);
+                deleteDirectory(f);
+            }
+            dir.delete();
+        } else dir.delete();
     }
+	
+	private boolean isSupportingFilesExists(String format, String name, String dir) 
+	{
+		if (!supportingFormats.containsKey(format))
+			return true;
+		for (Integer i = 0; i < supportingFormats.get(format).length; ++i)
+			if (!(new File(dir + name + "." + supportingFormats.get(format)[i])).exists())
+				return false;
+		return true;
+	}
+	
+	private StepMeta getFileStepMeta(String stepName, String fileName, String format)
+	{
+		try {
+	        Class<?> fileMetaClass = Class.forName(fileMetaClasses.get(format)[stepName == "input" ? 0 : 1]);
+	        Object fileMeta = fileMetaClass.newInstance();
+	        Method setFileNameMethod = fileMetaClass.getDeclaredMethod("setFileName", String.class);
+	        setFileNameMethod.invoke(fileMeta, new Object[]{fileName + "." + format});
+			return new StepMeta(stepName, (StepMetaInterface)fileMeta);
+		} catch (Exception e) {}
+		return null;
+	}
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
     {
         if (!request.getContextPath().equals(CONTEXT_PATH)) return;
         
         if (log.isDebug()) log.logDebug(toString(), Messages.getString("StartTransServlet.Log.StartTransRequested"));
-
-        String transName = request.getParameter("name");
-        boolean useXML = "Y".equalsIgnoreCase( request.getParameter("xml") );
-
-        response.setStatus(HttpServletResponse.SC_OK);
+       
+        Map<String, String> params = new HashMap<String, String>();
+        Map<String, String> inFilesNames = new HashMap<String, String>();
+        String newTmpDir = System.getProperty("user.dir") + "\\" + tmpFilesDir + randomString() + "\\";
+        (new File(newTmpDir)).mkdir();
         
-        PrintWriter out = response.getWriter();
-        if (useXML)
-        {
-            response.setContentType("text/xml");
-            response.setCharacterEncoding(Const.XML_ENCODING);
-            out.print(XMLHandler.getXMLHeader(Const.XML_ENCODING));
-        }
-        else
-        {
-            response.setContentType("text/html");
-            out.println("<HTML>");
-            out.println("<HEAD>");
-            out.println("<TITLE>" + Messages.getString("StartTransServlet.Log.StartOfTrans") + "</TITLE>");
-            out.println("<META http-equiv=\"Refresh\" content=\"2;url=/kettle/transStatus?name="+URLEncoder.encode(transName, "UTF-8")+"\">");
-            out.println("</HEAD>");
-            out.println("<BODY>");
-        }
-    
-        try
-        {
-            Trans trans = transformationMap.getTransformation(transName);
-            if (trans!=null)
-            {
-                // Log to a String & save appender for re-use later.
-                Log4jStringAppender appender = LogWriter.createStringAppender();
-                log.addAppender(appender);
-                transformationMap.addAppender(transName, appender);
-                
-                trans.execute(null);
-
-                String message = Messages.getString("StartTransServlet.Log.TransStarted",transName);
-                if (useXML)
+        try {
+            List<FileItem> items = new ServletFileUpload(new DiskFileItemFactory()).parseRequest(request);
+            for (FileItem item : items)
+                if (item.isFormField()) 
+                    params.put(item.getFieldName(), item.getString());
+                else 
                 {
-                    out.println(new WebResult(WebResult.STRING_OK, message).getXML());
-                }
-                else
-                {
+                    String fileName = FilenameUtils.getName(item.getName());
+                    InputStream fileContent = item.getInputStream();
+                    String format = fileName.split("\\.")[1];
                     
-                    out.println("<H1>"+message+"</H1>");
-                    out.println("<a href=\"/kettle/transStatus?name="+URLEncoder.encode(transName, "UTF-8")+"\">" + Messages.getString("TransStatusServlet.BackToStatusPage")+ "</a><p>");
+                    boolean isPermittedFormat = Arrays.asList(basicFormats).contains(format);
+                    for (Map.Entry<String, String[]> entry : supportingFormats.entrySet())
+                    	isPermittedFormat = isPermittedFormat || Arrays.asList(entry.getValue()).contains(format);
+                    if (!isPermittedFormat)
+                    	continue;
+                    
+                    if (Arrays.asList(basicFormats).contains(format))
+                    	inFilesNames.put(format, fileName.split("\\.")[0]); 
+                    File targetFile = new File(newTmpDir + fileName);
+                    FileUtils.copyInputStreamToFile(fileContent, targetFile);
                 }
-            }
-            else
-            {
-                String message = Messages.getString("TransStatusServlet.Log.CoundNotFindSpecTrans",transName);
-                if (useXML)
-                {
-                    out.println(new WebResult(WebResult.STRING_ERROR, message));
-                }
-                else
-                {
-                    out.println("<H1>"+message+"</H1>");
-                    out.println("<a href=\"/kettle/status\">" + Messages.getString("TransStatusServlet.BackToStatusPage")+"</a><p>");
-                }
-            }
+        } catch (FileUploadException e) {
+            throw new ServletException("Cannot parse multipart request.", e);
         }
-        catch (Exception ex)
-        {
-            if (useXML)
-            {
-                out.println(new WebResult(WebResult.STRING_ERROR, Messages.getString("StartTransServlet.Error.UnexpectedError",Const.CR+Const.getStackTracker(ex))));
-            }
-            else
-            {
-                out.println("<p>");
-                out.println("<pre>");
-                ex.printStackTrace(out);
-                out.println("</pre>");
-            }
-        }
+        
+        TransMeta transMeta = null;
+		try {
+			transMeta = new TransMeta(transFilesDir + transFiles.get(Integer.parseInt(params.get("trans_id"))));
+		} catch (KettleXMLException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+		
+        StepMeta srsStep = transMeta.findStep("trans");
+		SRSTransformationMeta srsMeta = (SRSTransformationMeta)srsStep.getStepMetaInterface();	
+		srsMeta.setSourceSRS(SRS.createFromEPSG(params.get("in_srs")));
+		srsMeta.setTargetSRS(SRS.createFromEPSG(params.get("out_srs")));
 
-        if (!useXML)
+		TransHopMeta inputToSrsHop = new TransHopMeta();
+		inputToSrsHop.setEnabled();
+		inputToSrsHop.setToStep(srsStep);
+		transMeta.addTransHop(inputToSrsHop);
+		
+		String outFormat = basicFormats[Integer.parseInt(params.get("out_format"))];
+		TransHopMeta srsToOutputHop = new TransHopMeta();
+		srsToOutputHop.setEnabled();
+		srsToOutputHop.setFromStep(srsStep);
+		transMeta.addTransHop(srsToOutputHop);
+		
+        for (Map.Entry<String, String> entry : inFilesNames.entrySet())
         {
-            out.println("<p>");
-            out.println("</BODY>");
-            out.println("</HTML>");
+			if (!isSupportingFilesExists(entry.getKey(), entry.getValue(), newTmpDir))
+				continue;
+			String inFormat = entry.getKey();
+			StepMeta inputStep = getFileStepMeta("input", newTmpDir + entry.getValue(), inFormat);
+			transMeta.addStep(inputStep);
+			inputToSrsHop.setFromStep(inputStep);
+			
+			
+			try {
+				RowMetaInterface inputfields = transMeta.getStepFields("input");
+				String[] fieldNames	= inputfields.getFieldNamesAndTypes(100);
+				
+				Pattern p = Pattern.compile("(\\w+)\\s+\\(Geometry\\)");  
+				for (Integer i = 0; i < fieldNames.length; ++i)
+				{
+					Matcher m = p.matcher(fieldNames[i]);
+					if (m.matches())
+					{
+						srsMeta.setFieldName(m.group(1));	
+						break;
+					}
+				}
+			} catch (KettleStepException e1) {
+				e1.printStackTrace();
+			}
+
+			//TODO Проверять конфликт имён
+			StepMeta outputStep = getFileStepMeta("output", newTmpDir + "new_" + entry.getValue(), outFormat);
+			transMeta.addStep(outputStep);
+			srsToOutputHop.setToStep(outputStep);
+
+			try {
+				Trans trans = new Trans(transMeta);
+				trans.execute(null);
+				trans.waitUntilFinished();
+			} catch (KettleException e) {
+				e.printStackTrace();
+			}   
+			transMeta.removeStep(transMeta.indexOfStep(inputStep));
+			transMeta.removeStep(transMeta.indexOfStep(outputStep));
         }
+        String ss = String.format(compressComand, newTmpDir, newTmpDir);
+        Runtime.getRuntime().exec(ss);
+		try {
+			TimeUnit.MILLISECONDS.sleep(1000);
+			while (!(new File(newTmpDir + "out.rar").exists()))
+				TimeUnit.MILLISECONDS.sleep(100);
+		} catch (InterruptedException e) {}
+		response.setContentType("application/x-please-download-me");
+		response.setHeader("Content-Disposition", "attachment; filename=out.rar");
+        ServletOutputStream out_file = response.getOutputStream();
+		FileInputStream in = new FileInputStream(newTmpDir + "out.rar");
+		IOUtils.copy(in, out_file);
+		in.close();
+		out_file.flush();
+		out_file.close();
+		deleteDirectory(new File(newTmpDir));
     }
 
     public String toString()
