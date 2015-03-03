@@ -135,6 +135,11 @@ public class WebServer
         Context transStatus = new Context(contexts, GetTransStatusServlet.CONTEXT_PATH, Context.SESSIONS);
         transStatus.addServlet(new ServletHolder(new GetTransStatusServlet(transformationMap)), "/*");
 
+        // Trans list
+        //
+        Context transList = new Context(contexts, GetTransListServlet.CONTEXT_PATH, Context.SESSIONS);
+        transList.addServlet(new ServletHolder(new GetTransListServlet(transformationMap)), "/*");
+        
         // Prepare execution
         //
         Context prepareExecution = new Context(contexts, PrepareExecutionTransServlet.CONTEXT_PATH, Context.SESSIONS);
