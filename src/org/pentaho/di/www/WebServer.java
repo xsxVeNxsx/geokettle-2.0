@@ -153,6 +153,7 @@ public class WebServer
         // Start transformation
         //
         Context startTrans = new Context(contexts, StartTransServlet.CONTEXT_PATH, Context.SESSIONS);
+        startTrans.setAllowNullPathInfo(true);
         startTrans.addServlet(new ServletHolder(new StartTransServlet(transformationMap)), "/*");
 
         // Pause/Resume transformation
