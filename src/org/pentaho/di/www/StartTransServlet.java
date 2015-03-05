@@ -12,30 +12,26 @@
 */
 package org.pentaho.di.www;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.net.URLEncoder;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 
-import javax.mail.Part;
-import javax.servlet.Servlet;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.pentaho.di.www.Config;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.pentaho.di.core.Const;
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.exception.KettleStepException;
 import org.pentaho.di.core.exception.KettleXMLException;
 import org.pentaho.di.core.geospatial.SRS;
-import org.pentaho.di.core.logging.Log4jStringAppender;
 import org.pentaho.di.core.logging.LogWriter;
-import org.pentaho.di.core.xml.XMLHandler;
 import org.pentaho.di.trans.Trans;
 import org.pentaho.di.trans.TransHopMeta;
 import org.pentaho.di.trans.TransMeta;
@@ -47,40 +43,30 @@ import org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta;
 import org.pentaho.di.trans.steps.gmlfileoutput.GMLFileOutputMeta;
 import org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta;
 import org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta;
-import org.pentaho.di.trans.steps.srstransformation.SRSList;
 import org.pentaho.di.trans.steps.srstransformation.SRSTransformationMeta;
-import org.pentaho.di.trans.steps.srstransformation.SRSTransformator;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.vfs.FileObject;
 
 import javax.servlet.ServletOutputStream;
 
-import java.io.FileInputStream;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.pentaho.di.core.row.RowMetaInterface;
-import org.pentaho.di.core.variables.VariableSpace;
-import org.pentaho.di.core.variables.Variables;
-import org.pentaho.di.core.vfs.KettleVFS;
 
 import java.security.SecureRandom;
-import java.lang.reflect.Array;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
-
-import jdk.internal.util.xml.impl.Pair;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadException;
