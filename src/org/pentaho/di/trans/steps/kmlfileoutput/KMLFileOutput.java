@@ -1,7 +1,9 @@
 package org.pentaho.di.trans.steps.kmlfileoutput;
 
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import org.apache.commons.vfs.FileObject;
 import org.apache.commons.vfs.FileSystemException;
@@ -158,8 +160,10 @@ public class KMLFileOutput extends BaseStep implements StepInterface {
 				logError("Error writing to file", e);
 			}
 			try {
-				data.kmlWriter.kml.marshal(data.kmlWriter.file);
-			} catch (FileNotFoundException e) {
+			    OutputStream os = new FileOutputStream(data.kmlWriter.file);
+				data.kmlWriter.kml.marshal(os);
+				os.close();
+			} catch (IOException e) {
 				logError("Error closing file.", e);
 			}
 			incrementLinesOutput();
