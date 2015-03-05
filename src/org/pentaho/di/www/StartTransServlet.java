@@ -169,17 +169,26 @@ public class StartTransServlet extends HttpServlet
 	   
         zos.close();
 	}
+	
+	protected void doOptions(HttpServletRequest request, HttpServletResponse response) throws ServletException
+	{
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
+        response.setHeader("Access-Control-Allow-Methods", "POST");
+	}
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
     {
         if (!request.getContextPath().equals(CONTEXT_PATH)) return;
         
         if (log.isDebug()) log.logDebug(toString(), Messages.getString("StartTransServlet.Log.StartTransRequested"));
-       
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
         Map<String, String> params = new HashMap<String, String>();
         Map<String, String> inFilesNames = new HashMap<String, String>();
         String newTmpDir = System.getProperty("user.dir") + "\\" + Config.tmpFilesDir + randomString() + "\\";
         (new File(newTmpDir)).mkdir();
+        (new File(newTmpDir + "out")).mkdir();
         
         try {
             List<FileItem> items = new ServletFileUpload(new DiskFileItemFactory()).parseRequest(request);
@@ -206,15 +215,17 @@ public class StartTransServlet extends HttpServlet
         } catch (FileUploadException e) {
             throw new ServletException("Cannot parse multipart request.", e);
         }
-        
+        params.put("location", request.getRequestURI());
         TransMeta transMeta = null;
 		try {
-			transMeta = new TransMeta(transFilesDir + transFiles.get(Integer.parseInt(params.get("trans_id"))));
-		} catch (KettleXMLException e2) {
-			// TODO Auto-generated catch block
-			e2.printStackTrace();
+			transMeta = new TransMeta(Config.transFilesDir + Config.transFiles[Integer.parseInt(params.get("trans_id"))]);
+		} catch (KettleXMLException e) {
+			ErrorsHandler.error(response, log, params, e);
 		}
 		
+		if (transMeta == null)
+		    return;
+		        
         StepMeta srsStep = transMeta.findStep("trans");
 		SRSTransformationMeta srsMeta = (SRSTransformationMeta)srsStep.getStepMetaInterface();	
 		srsMeta.setSourceSRS(SRS.createFromEPSG(params.get("in_srs")));
