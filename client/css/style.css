@@ -1,0 +1,15 @@
+input, select
+{
+	width: 180px;
+}
+
+.form_title
+{
+	font-weight: bold;
+	font-size: 18px;
+}
+
+#carte_form
+{
+	width: 300px;
+}

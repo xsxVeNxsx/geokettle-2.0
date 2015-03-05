@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<script type="text/javascript" src="js/shCore.js"></script>
+		<script type="text/javascript" src="js/shBrushJScript.js"></script>
+		<link type="text/css" rel="stylesheet" href="css/shCore.css"/>
+		<link type="text/css" rel="stylesheet" href="css/shThemeDefault.css"/>
+		<script type="text/javascript">
+			SyntaxHighlighter.all();
+		</script>
+		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+		<script type="text/javascript" src="js/jquery.searchabledropdown-1.0.8.min.js"></script>
+		<script src="js/carte.js"></script>
+		<script src="js/config.js"></script>
+		<link rel="stylesheet" type="text/css" href="css/style.css"/>
+		<title>Carte sender</title>
+	</head>
+	<body>	
+	    
+		<form enctype="multipart/form-data" method="post" id="carte_form">
+			<label for="trans_id">Операция: </label>
+			<br>
+			<select id="trans_id" name="trans_id">
+			</select>
+			<br><br>
+			<span class="form_title">Входные данные:</span>
+			<br><br>
+			<label for="in_srs">Система координат: </label>
+			<br>
+			<select id="in_srs" name="in_srs"></select>
+			<br>
+			<label for="input">Файл: </label>
+			<input type="file" id="input" name="input" multiple>
+			<br>
+			<div id="carte_params">
+			</div>
+			<br><br>
+			<input type="submit" value="Отправить" name="send" id="send">
+		</form>
+		<br><br>
+		<button id="test">TEST</button>
+	</body>
+</html>
