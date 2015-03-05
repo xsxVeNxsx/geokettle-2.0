@@ -115,7 +115,7 @@ public class StartTransServlet extends HttpServlet
     private static String transFilesDir = "dvo_trans\\";
     private static String compressComand = "C:\\Program Files (x86)\\WinRAR\\rar.exe A -ep1 %sout %snew_*";
     
-    public StartTransServlet(TransformationMap transformationMap)
+    public StartTransServlet()
     {
     }
     

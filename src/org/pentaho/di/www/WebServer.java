@@ -137,8 +137,8 @@ public class WebServer
 
         // Trans list
         //
-        Context transList = new Context(contexts, GetTransListServlet.CONTEXT_PATH, Context.SESSIONS);
-        transList.addServlet(new ServletHolder(new GetTransListServlet(transformationMap)), "/*");
+        Context transList = new Context(contexts, GetTransConfigServlet.CONTEXT_PATH, Context.SESSIONS);
+        transList.addServlet(new ServletHolder(new GetTransConfigServlet()), "/*");
         
         // Prepare execution
         //
@@ -154,7 +154,7 @@ public class WebServer
         //
         Context startTrans = new Context(contexts, StartTransServlet.CONTEXT_PATH, Context.SESSIONS);
         startTrans.setAllowNullPathInfo(true);
-        startTrans.addServlet(new ServletHolder(new StartTransServlet(transformationMap)), "/*");
+        startTrans.addServlet(new ServletHolder(new StartTransServlet()), "/*");
 
         // Pause/Resume transformation
         //
