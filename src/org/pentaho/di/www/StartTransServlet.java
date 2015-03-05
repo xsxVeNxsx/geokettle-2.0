@@ -26,6 +26,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.pentaho.di.www.Config;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.exception.KettleException;
@@ -92,15 +93,6 @@ public class StartTransServlet extends HttpServlet
     public static final String CONTEXT_PATH = "/kettle/startTrans";
     private static LogWriter log = LogWriter.getInstance();
     
-    private static String[] basicFormats = {"gml", "shp", "kml"};
-    private static Map<String, String[]> supportingFormats = new HashMap<String, String[]>() 
-    {{
-    	put("shp", new String[] {"dbf", "shx"});
-    }};
-    private static Map<Integer, String> transFiles = new HashMap<Integer, String>() 
-    {{
-    	put(0, "srs.ktr");
-    }};
     private static Map<String, String[]> fileMetaClasses = new HashMap<String, String[]>() 
     {{
     	put("gml", new String[] {"org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta",
@@ -110,10 +102,6 @@ public class StartTransServlet extends HttpServlet
     	put("kml", new String[] {"org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta",
 		 						"org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta"});
     }};
-    
-    private static String tmpFilesDir = "tmp\\";
-    private static String transFilesDir = "dvo_trans\\";
-    private static String compressComand = "C:\\Program Files (x86)\\WinRAR\\rar.exe A -ep1 %sout %snew_*";
     
     public StartTransServlet()
     {
@@ -168,7 +156,7 @@ public class StartTransServlet extends HttpServlet
        
         Map<String, String> params = new HashMap<String, String>();
         Map<String, String> inFilesNames = new HashMap<String, String>();
-        String newTmpDir = System.getProperty("user.dir") + "\\" + tmpFilesDir + randomString() + "\\";
+        String newTmpDir = System.getProperty("user.dir") + "\\" + Config.tmpFilesDir + randomString() + "\\";
         (new File(newTmpDir)).mkdir();
         
         try {
@@ -182,13 +170,13 @@ public class StartTransServlet extends HttpServlet
                     InputStream fileContent = item.getInputStream();
                     String format = fileName.split("\\.")[1];
                     
-                    boolean isPermittedFormat = Arrays.asList(basicFormats).contains(format);
-                    for (Map.Entry<String, String[]> entry : supportingFormats.entrySet())
+                    boolean isPermittedFormat = Arrays.asList(Config.basicFormats).contains(format);
+                    for (Map.Entry<String, String[]> entry : Config.supportingFormats.entrySet())
                     	isPermittedFormat = isPermittedFormat || Arrays.asList(entry.getValue()).contains(format);
                     if (!isPermittedFormat)
                     	continue;
                     
-                    if (Arrays.asList(basicFormats).contains(format))
+                    if (Arrays.asList(Config.basicFormats).contains(format))
                     	inFilesNames.put(format, fileName.split("\\.")[0]); 
                     File targetFile = new File(newTmpDir + fileName);
                     FileUtils.copyInputStreamToFile(fileContent, targetFile);
@@ -215,7 +203,7 @@ public class StartTransServlet extends HttpServlet
 		inputToSrsHop.setToStep(srsStep);
 		transMeta.addTransHop(inputToSrsHop);
 		
-		String outFormat = basicFormats[Integer.parseInt(params.get("out_format"))];
+		String outFormat = Config.basicFormats[Integer.parseInt(params.get("out_format"))];
 		TransHopMeta srsToOutputHop = new TransHopMeta();
 		srsToOutputHop.setEnabled();
 		srsToOutputHop.setFromStep(srsStep);
