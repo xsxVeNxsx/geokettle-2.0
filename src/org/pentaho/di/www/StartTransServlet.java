@@ -128,10 +128,10 @@ public class StartTransServlet extends HttpServlet
 	
 	private boolean isSupportingFilesExists(String format, String name, String dir) 
 	{
-		if (!supportingFormats.containsKey(format))
+		if (!Config.supportingFormats.containsKey(format))
 			return true;
-		for (Integer i = 0; i < supportingFormats.get(format).length; ++i)
-			if (!(new File(dir + name + "." + supportingFormats.get(format)[i])).exists())
+		for (Integer i = 0; i < Config.supportingFormats.get(format).length; ++i)
+			if (!(new File(dir + name + "." + Config.supportingFormats.get(format)[i])).exists())
 				return false;
 		return true;
 	}
@@ -146,6 +146,28 @@ public class StartTransServlet extends HttpServlet
 			return new StepMeta(stepName, (StepMetaInterface)fileMeta);
 		} catch (Exception e) {}
 		return null;
+	}
+	
+	private void compressFiles(String dir) throws IOException
+	{
+	    String[] children = new File(dir + "out\\").list();
+	    byte[] buffer = new byte[1024];
+	    FileOutputStream fos = new FileOutputStream(dir + "out.zip");
+	    ZipOutputStream zos = new ZipOutputStream(fos);
+        for (int i = 0; i < children.length; ++i) 
+        {
+            ZipEntry ze = new ZipEntry(children[i]);
+            zos.putNextEntry(ze);
+            FileInputStream in = new FileInputStream(dir + "out\\" + children[i]);
+            int len;
+            while ((len = in.read(buffer)) > 0)
+                zos.write(buffer, 0, len);
+
+            in.close();
+            zos.closeEntry();
+        }
+	   
+        zos.close();
 	}
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
@@ -237,8 +259,7 @@ public class StartTransServlet extends HttpServlet
 				e1.printStackTrace();
 			}
 
-			//TODO Проверять конфликт имён
-			StepMeta outputStep = getFileStepMeta("output", newTmpDir + "new_" + entry.getValue(), outFormat);
+			StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + entry.getValue(), outFormat);
 			transMeta.addStep(outputStep);
 			srsToOutputHop.setToStep(outputStep);
 
@@ -250,19 +271,15 @@ public class StartTransServlet extends HttpServlet
 				e.printStackTrace();
 			}   
 			transMeta.removeStep(transMeta.indexOfStep(inputStep));
+			inputStep = null;
 			transMeta.removeStep(transMeta.indexOfStep(outputStep));
+			outputStep = null;
         }
-        String ss = String.format(compressComand, newTmpDir, newTmpDir);
-        Runtime.getRuntime().exec(ss);
-		try {
-			TimeUnit.MILLISECONDS.sleep(1000);
-			while (!(new File(newTmpDir + "out.rar").exists()))
-				TimeUnit.MILLISECONDS.sleep(100);
-		} catch (InterruptedException e) {}
+        compressFiles(newTmpDir);
 		response.setContentType("application/x-please-download-me");
-		response.setHeader("Content-Disposition", "attachment; filename=out.rar");
+		response.setHeader("Content-Disposition", "attachment; filename=out.zip");
         ServletOutputStream out_file = response.getOutputStream();
-		FileInputStream in = new FileInputStream(newTmpDir + "out.rar");
+		FileInputStream in = new FileInputStream(newTmpDir + "out.zip");
 		IOUtils.copy(in, out_file);
 		in.close();
 		out_file.flush();
