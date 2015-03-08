@@ -9,7 +9,7 @@
  * Software distributed under the GNU Lesser Public License is distributed on an "AS IS" 
  * basis, WITHOUT WARRANTY OF ANY KIND, either express or  implied. Please refer to 
  * the license for the specific language governing your rights and limitations.
-*/
+ */
 package org.pentaho.di.www;
 
 import java.io.BufferedReader;
@@ -65,6 +65,7 @@ import org.pentaho.di.core.row.RowMetaInterface;
 import java.security.SecureRandom;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
@@ -78,69 +79,77 @@ public class StartTransServlet extends HttpServlet
     private static final long serialVersionUID = -5879200987669847357L;
     public static final String CONTEXT_PATH = "/kettle/startTrans";
     private static LogWriter log = LogWriter.getInstance();
-    
-    private static Map<String, String[]> fileMetaClasses = new HashMap<String, String[]>() 
-    {{
-    	put("gml", new String[] {"org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta",
-		 						"org.pentaho.di.trans.steps.gmlfileoutput.GMLFileOutputMeta"});
-    	put("shp", new String[] {"org.pentaho.di.trans.steps.gisfileinput.GISFileInputMeta",
-	 							"org.pentaho.di.trans.steps.gisfileoutput.GISFileOutputMeta"});
-    	put("kml", new String[] {"org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta",
-		 						"org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta"});
-    }};
-    
+    private static ErrorsHandler errorsHandler;
+
+    private static Map<String, String[]> fileMetaClasses = new HashMap<String, String[]>()
+    {
+        {
+            put("gml", new String[] {"org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta",
+                    "org.pentaho.di.trans.steps.gmlfileoutput.GMLFileOutputMeta"});
+            put("shp", new String[] {"org.pentaho.di.trans.steps.gisfileinput.GISFileInputMeta",
+                    "org.pentaho.di.trans.steps.gisfileoutput.GISFileOutputMeta"});
+            put("kml", new String[] {"org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta",
+                    "org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta"});
+        }
+    };
+
     public StartTransServlet()
     {
     }
-    
-	public String randomString() 
-	{
-	    return new BigInteger(130, new SecureRandom()).toString(32);
-	}
-	
-	public void deleteDirectory(File dir)
-	{
-        if (dir.isDirectory()) 
+
+    public String randomString()
+    {
+        return new BigInteger(130, new SecureRandom()).toString(32);
+    }
+
+    public void deleteDirectory(File dir)
+    {
+        if (dir.isDirectory())
         {
             String[] children = dir.list();
-            for (int i = 0; i < children.length; ++i) 
+            for (int i = 0; i < children.length; ++i)
             {
                 File f = new File(dir, children[i]);
                 deleteDirectory(f);
             }
             dir.delete();
-        } else dir.delete();
+        } else
+            dir.delete();
     }
-	
-	private boolean isSupportingFilesExists(String format, String name, String dir) 
-	{
-		if (!Config.supportingFormats.containsKey(format))
-			return true;
-		for (Integer i = 0; i < Config.supportingFormats.get(format).length; ++i)
-			if (!(new File(dir + name + "." + Config.supportingFormats.get(format)[i])).exists())
-				return false;
-		return true;
-	}
-	
-	private StepMeta getFileStepMeta(String stepName, String fileName, String format)
-	{
-		try {
-	        Class<?> fileMetaClass = Class.forName(fileMetaClasses.get(format)[stepName == "input" ? 0 : 1]);
-	        Object fileMeta = fileMetaClass.newInstance();
-	        Method setFileNameMethod = fileMetaClass.getDeclaredMethod("setFileName", String.class);
-	        setFileNameMethod.invoke(fileMeta, new Object[]{fileName + "." + format});
-			return new StepMeta(stepName, (StepMetaInterface)fileMeta);
-		} catch (Exception e) {}
-		return null;
-	}
-	
-	private void compressFiles(String dir) throws IOException
-	{
-	    String[] children = new File(dir + "out\\").list();
-	    byte[] buffer = new byte[1024];
-	    FileOutputStream fos = new FileOutputStream(dir + "out.zip");
-	    ZipOutputStream zos = new ZipOutputStream(fos);
-        for (int i = 0; i < children.length; ++i) 
+
+    private boolean isSupportingFilesExists(String format, String name, String dir)
+    {
+        if (!Config.supportingFormats.containsKey(format))
+            return true;
+        for (Integer i = 0; i < Config.supportingFormats.get(format).length; ++i)
+            if (!(new File(dir + name + "." + Config.supportingFormats.get(format)[i])).exists())
+                return false;
+        return true;
+    }
+
+    private StepMeta getFileStepMeta(String stepName, String fileName, String format) throws IOException
+    {
+        try
+        {
+            Class<?> fileMetaClass = Class.forName(fileMetaClasses.get(format)[stepName == "input" ? 0 : 1]);
+            Object fileMeta = fileMetaClass.newInstance();
+            Method setFileNameMethod = fileMetaClass.getDeclaredMethod("setFileName", String.class);
+            setFileNameMethod.invoke(fileMeta, new Object[] {fileName + "." + format});
+            return new StepMeta(stepName, (StepMetaInterface) fileMeta);
+        } catch (Exception e)
+        {
+            errorsHandler.add("Reflection error", e.getMessage());
+        }
+        return null;
+    }
+
+    private void compressFiles(String dir) throws IOException
+    {
+        String[] children = new File(dir + "out\\").list();
+        byte[] buffer = new byte[1024];
+        FileOutputStream fos = new FileOutputStream(dir + "out.zip");
+        ZipOutputStream zos = new ZipOutputStream(fos);
+        for (int i = 0; i < children.length; ++i)
         {
             ZipEntry ze = new ZipEntry(children[i]);
             zos.putNextEntry(ze);
@@ -152,136 +161,157 @@ public class StartTransServlet extends HttpServlet
             in.close();
             zos.closeEntry();
         }
-	   
-        zos.close();
-	}
-	
-	protected void doOptions(HttpServletRequest request, HttpServletResponse response) throws ServletException
-	{
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
-        response.setHeader("Access-Control-Allow-Methods", "POST");
-	}
 
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
+        zos.close();
+        if (children.length == 0)
+            errorsHandler.add("Compress output files error", "There are not output files");
+        if (!(new File(dir + "out.zip").exists()))
+            errorsHandler.add("Compress output files error", "Has been not created out.zip");
+    }
+
+    private void validateParams(Map<String, String> params, Map<String, String> files) throws IOException
     {
-        if (!request.getContextPath().equals(CONTEXT_PATH)) return;
-        
-        if (log.isDebug()) log.logDebug(toString(), Messages.getString("StartTransServlet.Log.StartTransRequested"));
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
+        for (Integer i = 0; i < Config.startTransRequestParams.length; ++i)
+            if (!params.containsKey(Config.startTransRequestParams[i]))
+                errorsHandler.add("Bad request",
+                        "There is no expected param " + params.containsKey(Config.startTransRequestParams[i]));
+        if (files.size() == 0)
+            errorsHandler.add("Bad request", "There is no input files");
+    }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException,
+            IOException
+    {
+        if (!request.getContextPath().equals(CONTEXT_PATH))
+            return;
+
+        if (log.isDebug())
+            log.logDebug(toString(), Messages.getString("StartTransServlet.Log.StartTransRequested"));
+
+        errorsHandler = new ErrorsHandler(response, log, request.getHeader("Origin"));
+
         Map<String, String> params = new HashMap<String, String>();
         Map<String, String> inFilesNames = new HashMap<String, String>();
         String newTmpDir = System.getProperty("user.dir") + "\\" + Config.tmpFilesDir + randomString() + "\\";
         (new File(newTmpDir)).mkdir();
         (new File(newTmpDir + "out")).mkdir();
-        
-        try {
+
+        try
+        {
             List<FileItem> items = new ServletFileUpload(new DiskFileItemFactory()).parseRequest(request);
             for (FileItem item : items)
-                if (item.isFormField()) 
+                if (item.isFormField())
                     params.put(item.getFieldName(), item.getString());
-                else 
+                else
                 {
                     String fileName = FilenameUtils.getName(item.getName());
+                    if (fileName.equals(""))
+                        continue;
                     InputStream fileContent = item.getInputStream();
                     String format = fileName.split("\\.")[1];
-                    
+
                     boolean isPermittedFormat = Arrays.asList(Config.basicFormats).contains(format);
                     for (Map.Entry<String, String[]> entry : Config.supportingFormats.entrySet())
-                    	isPermittedFormat = isPermittedFormat || Arrays.asList(entry.getValue()).contains(format);
+                        isPermittedFormat = isPermittedFormat || Arrays.asList(entry.getValue()).contains(format);
                     if (!isPermittedFormat)
-                    	continue;
-                    
+                        continue;
+
                     if (Arrays.asList(Config.basicFormats).contains(format))
-                    	inFilesNames.put(format, fileName.split("\\.")[0]); 
+                        inFilesNames.put(format, fileName.split("\\.")[0]);
                     File targetFile = new File(newTmpDir + fileName);
                     FileUtils.copyInputStreamToFile(fileContent, targetFile);
                 }
-        } catch (FileUploadException e) {
-            throw new ServletException("Cannot parse multipart request.", e);
-        }
-        params.put("location", request.getRequestURI());
-        TransMeta transMeta = null;
-		try {
-			transMeta = new TransMeta(Config.transFilesDir + Config.transFiles[Integer.parseInt(params.get("trans_id"))]);
-		} catch (KettleXMLException e) {
-			ErrorsHandler.error(response, log, params, e);
-		}
-		
-		if (transMeta == null)
-		    return;
-		        
-        StepMeta srsStep = transMeta.findStep("trans");
-		SRSTransformationMeta srsMeta = (SRSTransformationMeta)srsStep.getStepMetaInterface();	
-		srsMeta.setSourceSRS(SRS.createFromEPSG(params.get("in_srs")));
-		srsMeta.setTargetSRS(SRS.createFromEPSG(params.get("out_srs")));
-
-		TransHopMeta inputToSrsHop = new TransHopMeta();
-		inputToSrsHop.setEnabled();
-		inputToSrsHop.setToStep(srsStep);
-		transMeta.addTransHop(inputToSrsHop);
-		
-		String outFormat = Config.basicFormats[Integer.parseInt(params.get("out_format"))];
-		TransHopMeta srsToOutputHop = new TransHopMeta();
-		srsToOutputHop.setEnabled();
-		srsToOutputHop.setFromStep(srsStep);
-		transMeta.addTransHop(srsToOutputHop);
-		
-        for (Map.Entry<String, String> entry : inFilesNames.entrySet())
+        } catch (FileUploadException e)
         {
-			if (!isSupportingFilesExists(entry.getKey(), entry.getValue(), newTmpDir))
-				continue;
-			String inFormat = entry.getKey();
-			StepMeta inputStep = getFileStepMeta("input", newTmpDir + entry.getValue(), inFormat);
-			transMeta.addStep(inputStep);
-			inputToSrsHop.setFromStep(inputStep);
-			
-			
-			try {
-				RowMetaInterface inputfields = transMeta.getStepFields("input");
-				String[] fieldNames	= inputfields.getFieldNamesAndTypes(100);
-				
-				Pattern p = Pattern.compile("(\\w+)\\s+\\(Geometry\\)");  
-				for (Integer i = 0; i < fieldNames.length; ++i)
-				{
-					Matcher m = p.matcher(fieldNames[i]);
-					if (m.matches())
-					{
-						srsMeta.setFieldName(m.group(1));	
-						break;
-					}
-				}
-			} catch (KettleStepException e1) {
-				e1.printStackTrace();
-			}
+            errorsHandler.add("Request's params parsing error", e.getMessage());
+        }
 
-			StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + entry.getValue(), outFormat);
-			transMeta.addStep(outputStep);
-			srsToOutputHop.setToStep(outputStep);
+        validateParams(params, inFilesNames);
+        try
+        {
+            if (errorsHandler.count() != 0)
+                throw new Exception();
 
-			try {
-				Trans trans = new Trans(transMeta);
-				trans.execute(null);
-				trans.waitUntilFinished();
-			} catch (KettleException e) {
-				e.printStackTrace();
-			}   
-			transMeta.removeStep(transMeta.indexOfStep(inputStep));
-			inputStep = null;
-			transMeta.removeStep(transMeta.indexOfStep(outputStep));
-			outputStep = null;
+            TransMeta transMeta;
+            transMeta = new TransMeta(Config.transFilesDir
+                    + Config.transFiles[Integer.parseInt(params.get("trans_id"))]);
+
+            StepMeta srsStep = transMeta.findStep("trans");
+            SRSTransformationMeta srsMeta = (SRSTransformationMeta) srsStep.getStepMetaInterface();
+            srsMeta.setSourceSRS(SRS.createFromEPSG(params.get("in_srs")));
+            srsMeta.setTargetSRS(SRS.createFromEPSG(params.get("out_srs")));
+
+            TransHopMeta inputToSrsHop = new TransHopMeta();
+            inputToSrsHop.setEnabled();
+            inputToSrsHop.setToStep(srsStep);
+            transMeta.addTransHop(inputToSrsHop);
+
+            String outFormat = Config.basicFormats[Integer.parseInt(params.get("out_format"))];
+            TransHopMeta srsToOutputHop = new TransHopMeta();
+            srsToOutputHop.setEnabled();
+            srsToOutputHop.setFromStep(srsStep);
+            transMeta.addTransHop(srsToOutputHop);
+
+            for (Map.Entry<String, String> entry : inFilesNames.entrySet())
+            {
+                if (!isSupportingFilesExists(entry.getKey(), entry.getValue(), newTmpDir))
+                    continue;
+                String inFormat = entry.getKey();
+                StepMeta inputStep = getFileStepMeta("input", newTmpDir + entry.getValue(), inFormat);
+                transMeta.addStep(inputStep);
+                inputToSrsHop.setFromStep(inputStep);
+
+                RowMetaInterface inputfields = transMeta.getStepFields("input");
+                String[] fieldNames = inputfields.getFieldNamesAndTypes(100);
+
+                Pattern p = Pattern.compile("(\\w+)\\s+\\(Geometry\\)");
+                for (Integer i = 0; i < fieldNames.length; ++i)
+                {
+                    Matcher m = p.matcher(fieldNames[i]);
+                    if (m.matches())
+                    {
+                        srsMeta.setFieldName(m.group(1));
+                        break;
+                    }
+                }
+
+                StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + entry.getValue(), outFormat);
+                transMeta.addStep(outputStep);
+                srsToOutputHop.setToStep(outputStep);
+
+                Trans trans = new Trans(transMeta);
+                trans.execute(null);
+                trans.waitUntilFinished();
+
+                transMeta.removeStep(transMeta.indexOfStep(inputStep));
+                transMeta.removeStep(transMeta.indexOfStep(outputStep));
+            }
+        } catch (KettleXMLException e)
+        {
+            errorsHandler.add("Trans file loading error", e.getMessage());
+        } catch (KettleStepException e)
+        {
+            errorsHandler.add("Input file fields reading error", e.getMessage());
+        } catch (KettleException e)
+        {
+            errorsHandler.add("Trans execution error", e.getMessage());
+        } catch (Exception e)
+        {
         }
         compressFiles(newTmpDir);
-		response.setContentType("application/x-please-download-me");
-		response.setHeader("Content-Disposition", "attachment; filename=out.zip");
-        ServletOutputStream out_file = response.getOutputStream();
-		FileInputStream in = new FileInputStream(newTmpDir + "out.zip");
-		IOUtils.copy(in, out_file);
-		in.close();
-		out_file.flush();
-		out_file.close();
-		deleteDirectory(new File(newTmpDir));
+        if (errorsHandler.count() == 0)
+        {
+            response.setContentType("application/x-please-download-me");
+            response.setHeader("Content-Disposition", "attachment; filename=out.zip");
+            ServletOutputStream out_file = response.getOutputStream();
+            FileInputStream in = new FileInputStream(newTmpDir + "out.zip");
+            IOUtils.copy(in, out_file);
+            in.close();
+            out_file.flush();
+            out_file.close();
+        } else
+            errorsHandler.print();
+        deleteDirectory(new File(newTmpDir));
     }
 
     public String toString()

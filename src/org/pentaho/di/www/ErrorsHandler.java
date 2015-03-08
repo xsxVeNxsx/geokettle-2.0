@@ -2,31 +2,54 @@ package org.pentaho.di.www;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
-import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.pentaho.di.core.logging.LogWriter;
 
-public class ErrorsHandler 
+public class ErrorsHandler
 {
-    public static void error(HttpServletResponse response, LogWriter log,  Map<String, String> params, 
-                                                                            Exception e) throws IOException
+    private List<Map<String, String>> errors = new ArrayList<Map<String, String>>();
+    private HttpServletResponse response;
+    private LogWriter log;
+    private String requestOrigin;
+
+    public ErrorsHandler(HttpServletResponse _response, LogWriter _log, String _requestOrigin)
     {
-        response.setContentType("text/javascript;charset=UTF-8");
-        response.setHeader("Location", params.get("location"));
-        PrintWriter out = response.getWriter();
-        Map<String, String> toJson = new HashMap<String, String>();
-        for (Map.Entry<String, String> entry : params.entrySet())
+        response = _response;
+        log = _log;
+        requestOrigin = _requestOrigin;
+    }
+
+    public Integer count()
+    {
+        return errors.size();
+    }
+
+    public void add(String errorTitle, String errorText) throws IOException
+    {
+        Map<String, String> newError = new HashMap<String, String>();
+        newError.put("ErrorTitle", errorTitle);
+        newError.put("ErrorText", errorText);
+        errors.add(newError);
+    }
+
+    public void print() throws IOException
+    {
+        Iterator<Map<String, String>> itr = errors.iterator();
+        while (itr.hasNext())
         {
-            toJson.put(entry.getKey(), entry.getValue());
+            Map<String, String> tmp = itr.next();
+            log.logError(tmp.get("ErrorTitle"), tmp.get("ErrorText"));
         }
-        out.print(new JSONObject(toJson)); 
-        log.logBasic("StartTrans", e.getMessage());
+        PrintWriter out = response.getWriter();
         JSONArray jsonArr = new JSONArray();
         for (Integer i = 0; i < errors.size(); ++i)
             jsonArr.put(new JSONObject(errors.get(i)));
