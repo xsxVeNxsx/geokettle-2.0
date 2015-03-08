@@ -42,7 +42,7 @@ function loadTransConfig()
 {
 	$.ajax({
 		method: 'GET',
-		url: CARTE_URL + 'transConfig?jsonp=transConfigJSON',
+		url: CARTE_URL + '/transConfig?jsonp=transConfigJSON',
 		dataType : "jsonp",
 		jsonpCallback: 'transConfigJSON',
         async: false,
@@ -51,7 +51,7 @@ function loadTransConfig()
 
 function receiveMessage(event)
 {
-	if (event.origin !== CARTE_DOMAIN)
+	if (event.origin !== CARTE_URL)
 		return;
 	
 	var json = event.data;
@@ -71,7 +71,7 @@ function receiveMessage(event)
 $(document).ready(function() 
 {
 	window.addEventListener("message", receiveMessage, false);
-	$("#carte_form").attr("action", CARTE_URL + "startTrans/");
+	$("#carte_form").attr("action", CARTE_URL + "/startTrans/");
 	for (var i in SRS_ARR)
 	{
 		var tmp = SRS_ARR[i];

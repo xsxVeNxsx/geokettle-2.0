@@ -18,7 +18,7 @@ public class GetTransConfigServlet  extends HttpServlet
 {
 	private static final long serialVersionUID = -305350993299364110L;
 
-	public static final String CONTEXT_PATH = "/kettle/transConfig";
+	public static final String CONTEXT_PATH = "/transConfig";
     private static LogWriter log = LogWriter.getInstance();
     
     public void writeJSON(HttpServletResponse response, JSONObject json, String callbackName) throws IOException

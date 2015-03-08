@@ -58,7 +58,7 @@ import org.pentaho.di.trans.steps.srstransformation.SRSTransformationMeta;
 public class StartTransServlet extends HttpServlet
 {
     private static final long serialVersionUID = -5879200987669847357L;
-    public static final String CONTEXT_PATH = "/kettle/startTrans";
+    public static final String CONTEXT_PATH = "/startTrans";
     private static LogWriter log = LogWriter.getInstance();
     private static ErrorsHandler errorsHandler;
 
