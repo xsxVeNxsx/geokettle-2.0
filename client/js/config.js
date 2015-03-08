@@ -1,5 +1,6 @@
 const 
-	CARTE_URL = "http://localhost:8082/kettle/", 
+	CARTE_DOMAIN = "http://localhost:8082"
+	CARTE_URL = CARTE_DOMAIN + "/kettle/", 
 	REDESIGN_TRANS = 0,
 	SRS_ARR = [{id: 4143, desc: "Abidjan 1987"},
 		{id: 61436405, desc: "Abidjan 1987 (deg)"},

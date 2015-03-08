@@ -27,5 +27,10 @@ public class ErrorsHandler
         }
         out.print(new JSONObject(toJson)); 
         log.logBasic("StartTrans", e.getMessage());
+        JSONArray jsonArr = new JSONArray();
+        for (Integer i = 0; i < errors.size(); ++i)
+            jsonArr.put(new JSONObject(errors.get(i)));
+        String script = "window.parent.postMessage('" + jsonArr + "', '*');";
+        out.print("<script>" + script + "</script>");
     }
 }

@@ -76,8 +76,28 @@ function testAjax()
 	});
 }
 
+function receiveMessage(event)
+{
+	if (event.origin !== CARTE_DOMAIN)
+		return;
+	
+	var json = event.data;
+	json = JSON.parse(json);
+	var text = "";
+	for (var i = 0; i < json.length; ++i)
+		text += "<span class='error_title'>" + json[i]["ErrorTitle"] + ": </span>" + 
+				json[i]["ErrorText"] + "<br>";
+				
+	dhtmlx.alert({
+		title: "Ошибки запроса",
+		ok:	"OK",
+		text: text,
+	});
+}
+
 $(document).ready(function() 
 {
+	window.addEventListener("message", receiveMessage, false);
 	$("#carte_form").attr("action", CARTE_URL + "startTrans/");
 	$("#carte_test").attr("action", CARTE_URL + "startTrans/");
 	for (var i in SRS_ARR)
