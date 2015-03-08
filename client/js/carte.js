@@ -49,33 +49,6 @@ function loadTransConfig()
 	});
 }
 
-function testAjax()
-{
-    var formData = new FormData();    
-	for (var i = 0; i < $('#input').prop('files').length; ++i)
-		formData.append('input[]', $('#input').prop('files')[i]);
-	var children = $("#carte_form input, #carte_form select");
-	for (var i = 0; i < children.length; ++i)
-	{
-		if ($(children[i]).is("input[type='file']") || $(children[i]).is("input[type='submit']"))
-			continue;
-		formData.append($(children[i]).attr("name"), $(children[i]).val());
-	}
-	$.ajax({
-		type: 'post',
-		url: CARTE_URL + "startTrans/",
-		processData: false,
-		contentType: false,
-        success: function(data){
-			console.log(data);
-		},
-		error: function(data){
-			console.log(data);
-		},
-		data: formData,
-	});
-}
-
 function receiveMessage(event)
 {
 	if (event.origin !== CARTE_DOMAIN)
@@ -99,7 +72,6 @@ $(document).ready(function()
 {
 	window.addEventListener("message", receiveMessage, false);
 	$("#carte_form").attr("action", CARTE_URL + "startTrans/");
-	$("#carte_test").attr("action", CARTE_URL + "startTrans/");
 	for (var i in SRS_ARR)
 	{
 		var tmp = SRS_ARR[i];
@@ -107,6 +79,5 @@ $(document).ready(function()
 	}
 	$("#in_srs").searchable({maxMultiMatch: 200});
 	$("#trans_id").change(onTransIDChange);
-	$("#test").click(testAjax);
 	loadTransConfig();
 });
