@@ -13,3 +13,14 @@ input, select
 {
 	width: 300px;
 }
+
+#hidden_frame
+{
+	display: none;
+}
+
+.error_title
+{
+	font-weight: bold;
+	font-size: 15px;
+}

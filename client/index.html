@@ -14,11 +14,14 @@
 		<script src="js/carte.js"></script>
 		<script src="js/config.js"></script>
 		<link rel="stylesheet" type="text/css" href="css/style.css"/>
+		
+		<script type="text/javascript" src='js/message.js'></script>
+		<link rel="stylesheet" type="text/css" href="css/message_default.css">
 		<title>Carte sender</title>
 	</head>
 	<body>	
 	    
-		<form enctype="multipart/form-data" method="post" id="carte_form">
+		<form enctype="multipart/form-data" method="post" id="carte_form" target="hidden_frame">
 			<label for="trans_id">Операция: </label>
 			<br>
 			<select id="trans_id" name="trans_id">
@@ -40,5 +43,12 @@
 		</form>
 		<br><br>
 		<button id="test">TEST</button>
+		
+		<iframe id='hidden_frame' name='hidden_frame'>
+			<html>
+				<body>
+				</body>
+			</html>
+		</iframe>
 	</body>
 </html>
