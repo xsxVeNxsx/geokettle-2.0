@@ -20,8 +20,10 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -116,6 +118,11 @@ public class StartTransServlet extends HttpServlet
             Object fileMeta = fileMetaClass.newInstance();
             Method setFileNameMethod = fileMetaClass.getDeclaredMethod("setFileName", String.class);
             setFileNameMethod.invoke(fileMeta, new Object[] {fileName + "." + format});
+            if (format == "shp")
+            {
+                Method setCharsetMethod = fileMetaClass.getDeclaredMethod("setGisFileCharset", String.class);
+                setCharsetMethod.invoke(fileMeta, new Object[] {Config.defGisCharset});
+            }
             return new StepMeta(stepName, (StepMetaInterface) fileMeta);
         } catch (Exception e)
         {
@@ -150,7 +157,7 @@ public class StartTransServlet extends HttpServlet
             errorsHandler.add("Compress output files error", "Has been not created out.zip");
     }
 
-    private void validateParams(Map<String, String> params, Map<String, String> files) throws IOException
+    private void validateParams(Map<String, String> params, List<String> files) throws IOException
     {
         for (Integer i = 0; i < Config.startTransRequestParams.length; ++i)
             if (!params.containsKey(Config.startTransRequestParams[i]))
@@ -172,7 +179,7 @@ public class StartTransServlet extends HttpServlet
         errorsHandler = new ErrorsHandler(response, log, request.getHeader("Origin"));
 
         Map<String, String> params = new HashMap<String, String>();
-        Map<String, String> inFilesNames = new HashMap<String, String>();
+        List<String> inFilesNames = new ArrayList<String>();
         String newTmpDir = System.getProperty("user.dir") + "\\" + Config.tmpFilesDir + randomString() + "\\";
         (new File(newTmpDir)).mkdir();
         (new File(newTmpDir + "out")).mkdir();
@@ -190,7 +197,6 @@ public class StartTransServlet extends HttpServlet
                         continue;
                     InputStream fileContent = item.getInputStream();
                     String format = fileName.split("\\.")[1];
-
                     boolean isPermittedFormat = Arrays.asList(Config.basicFormats).contains(format);
                     for (Map.Entry<String, String[]> entry : Config.supportingFormats.entrySet())
                         isPermittedFormat = isPermittedFormat || Arrays.asList(entry.getValue()).contains(format);
@@ -198,7 +204,7 @@ public class StartTransServlet extends HttpServlet
                         continue;
 
                     if (Arrays.asList(Config.basicFormats).contains(format))
-                        inFilesNames.put(format, fileName.split("\\.")[0]);
+                        inFilesNames.add(fileName);
                     File targetFile = new File(newTmpDir + fileName);
                     FileUtils.copyInputStreamToFile(fileContent, targetFile);
                 }
@@ -233,12 +239,15 @@ public class StartTransServlet extends HttpServlet
             srsToOutputHop.setFromStep(srsStep);
             transMeta.addTransHop(srsToOutputHop);
 
-            for (Map.Entry<String, String> entry : inFilesNames.entrySet())
+            Iterator<String> itr = inFilesNames.iterator();
+            while (itr.hasNext())
             {
-                if (!isSupportingFilesExists(entry.getKey(), entry.getValue(), newTmpDir))
+                String tmp = itr.next();
+                String fileNameSufx = tmp.split("\\.")[0], inFormat = tmp.split("\\.")[1];
+                if (!isSupportingFilesExists(inFormat, fileNameSufx, newTmpDir))
                     continue;
-                String inFormat = entry.getKey();
-                StepMeta inputStep = getFileStepMeta("input", newTmpDir + entry.getValue(), inFormat);
+
+                StepMeta inputStep = getFileStepMeta("input", newTmpDir + fileNameSufx, inFormat);
                 transMeta.addStep(inputStep);
                 inputToSrsHop.setFromStep(inputStep);
 
@@ -255,8 +264,7 @@ public class StartTransServlet extends HttpServlet
                         break;
                     }
                 }
-
-                StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + entry.getValue(), outFormat);
+                StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + fileNameSufx, outFormat);
                 transMeta.addStep(outputStep);
                 srsToOutputHop.setToStep(outputStep);
 
