@@ -264,6 +264,8 @@ public class StartTransServlet extends HttpServlet
                         break;
                     }
                 }
+                if (new File(newTmpDir + "out//" + fileNameSufx + "." + outFormat).exists())
+                    fileNameSufx = randomString();
                 StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + fileNameSufx, outFormat);
                 transMeta.addStep(outputStep);
                 srsToOutputHop.setToStep(outputStep);
