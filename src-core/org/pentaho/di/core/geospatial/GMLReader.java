@@ -134,7 +134,6 @@ public class GMLReader {
 	}
 
 	public Object[] getRow(Object[] r) throws KettleException {
-		PropertyType[] props = fc.getFeature(0).getFeatureType().getProperties();
 		String debug ="Retrieving row.";
 		try {
 			if (fc.size() == 0 || row_index == 0)
@@ -148,7 +147,7 @@ public class GMLReader {
 
 			Feature feat = fc.getFeature(row_index - 1);
 			FeatureProperty[] featProperties = feat.getProperties();
-
+			PropertyType[] props = feat.getFeatureType().getProperties();
 			for (int j = 0; j < props.length; j++) {
 				debug = "getting value #" + j;
 				int pt = props[j].getType();
