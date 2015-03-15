@@ -28,6 +28,20 @@ function onTransIDChange()
 	}
 	else {}
 }
+
+function onInputTypeChange()
+{
+	$("label[for='input']").next().remove();
+	$("label[for='input']").next().remove();
+	var input;
+	if ($("#in_type").val() == "wfs")
+		input = $('<input/>', {'name': "input", "id": "input", "type": "text"});
+	else
+		input = $('<input/>', {'name': "input", "id": "input", "type": "file", "multiple": "multiple"});
+	var br = $('<br>');
+	br.insertAfter($("label[for='input']"));
+	input.insertAfter(br);
+}
 		
 function transConfigJSON(json)
 {
@@ -70,6 +84,8 @@ function receiveMessage(event)
 
 $(document).ready(function() 
 {
+	$("#in_type").change(onInputTypeChange);
+	onInputTypeChange();
 	window.addEventListener("message", receiveMessage, false);
 	$("#carte_form").attr("action", CARTE_URL + "/startTrans/");
 	for (var i in SRS_ARR)

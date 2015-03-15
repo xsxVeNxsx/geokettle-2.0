@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
+import java.net.URL;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -212,7 +213,11 @@ public class StartTransServlet extends HttpServlet
         {
             errorsHandler.add("Request's params parsing error", e.getMessage());
         }
-
+        if (params.get("in_type").equals("wfs"))
+        {
+            WFSClient.LoadFeature(new URL(params.get("input")), newTmpDir);
+            inFilesNames.add(Config.WFSTmpInFileName);
+        }
         validateParams(params, inFilesNames);
         try
         {
