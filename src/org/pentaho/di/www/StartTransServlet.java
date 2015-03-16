@@ -14,13 +14,10 @@ package org.pentaho.di.www;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
-import java.math.BigInteger;
 import java.net.URL;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,8 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -81,36 +76,6 @@ public class StartTransServlet extends HttpServlet
     {
     }
 
-    public String randomString()
-    {
-        return new BigInteger(130, new SecureRandom()).toString(32);
-    }
-
-    public void deleteDirectory(File dir)
-    {
-        if (dir.isDirectory())
-        {
-            String[] children = dir.list();
-            for (int i = 0; i < children.length; ++i)
-            {
-                File f = new File(dir, children[i]);
-                deleteDirectory(f);
-            }
-            dir.delete();
-        } else
-            dir.delete();
-    }
-
-    private boolean isSupportingFilesExists(String format, String name, String dir)
-    {
-        if (!Config.supportingFormats.containsKey(format))
-            return true;
-        for (Integer i = 0; i < Config.supportingFormats.get(format).length; ++i)
-            if (!(new File(dir + name + "." + Config.supportingFormats.get(format)[i])).exists())
-                return false;
-        return true;
-    }
-
     private StepMeta getFileStepMeta(String stepName, String fileName, String format) throws IOException
     {
         try
@@ -132,42 +97,6 @@ public class StartTransServlet extends HttpServlet
         return null;
     }
 
-    private void compressFiles(String dir) throws IOException
-    {
-        String[] children = new File(dir + "out\\").list();
-        byte[] buffer = new byte[1024];
-        FileOutputStream fos = new FileOutputStream(dir + "out.zip");
-        ZipOutputStream zos = new ZipOutputStream(fos);
-        for (int i = 0; i < children.length; ++i)
-        {
-            ZipEntry ze = new ZipEntry(children[i]);
-            zos.putNextEntry(ze);
-            FileInputStream in = new FileInputStream(dir + "out\\" + children[i]);
-            int len;
-            while ((len = in.read(buffer)) > 0)
-                zos.write(buffer, 0, len);
-
-            in.close();
-            zos.closeEntry();
-        }
-
-        zos.close();
-        if (children.length == 0)
-            errorsHandler.add("Compress output files error", "There are not output files");
-        if (!(new File(dir + "out.zip").exists()))
-            errorsHandler.add("Compress output files error", "Has been not created out.zip");
-    }
-
-    private void validateParams(Map<String, String> params, List<String> files) throws IOException
-    {
-        for (Integer i = 0; i < Config.startTransRequestParams.length; ++i)
-            if (!params.containsKey(Config.startTransRequestParams[i]))
-                errorsHandler.add("Bad request",
-                        "There is no expected param " + params.containsKey(Config.startTransRequestParams[i]));
-        if (files.size() == 0)
-            errorsHandler.add("Bad request", "There is no input files");
-    }
-
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException,
             IOException
     {
@@ -181,7 +110,8 @@ public class StartTransServlet extends HttpServlet
 
         Map<String, String> params = new HashMap<String, String>();
         List<String> inFilesNames = new ArrayList<String>();
-        String newTmpDir = System.getProperty("user.dir") + "\\" + Config.tmpFilesDir + randomString() + "\\";
+        String newTmpDir = System.getProperty("user.dir") + "\\" + Config.tmpFilesDir + CommonFunctions.randomString()
+                + "\\";
         (new File(newTmpDir)).mkdir();
         (new File(newTmpDir + "out")).mkdir();
 
@@ -218,7 +148,7 @@ public class StartTransServlet extends HttpServlet
             WFSClient.LoadFeature(new URL(params.get("input")), newTmpDir);
             inFilesNames.add(Config.WFSTmpInFileName);
         }
-        validateParams(params, inFilesNames);
+        CommonFunctions.validateParams(params, inFilesNames, errorsHandler);
         try
         {
             if (errorsHandler.count() != 0)
@@ -249,7 +179,7 @@ public class StartTransServlet extends HttpServlet
             {
                 String tmp = itr.next();
                 String fileNameSufx = tmp.split("\\.")[0], inFormat = tmp.split("\\.")[1];
-                if (!isSupportingFilesExists(inFormat, fileNameSufx, newTmpDir))
+                if (!CommonFunctions.isSupportingFilesExists(inFormat, fileNameSufx, newTmpDir))
                     continue;
 
                 StepMeta inputStep = getFileStepMeta("input", newTmpDir + fileNameSufx, inFormat);
@@ -270,7 +200,7 @@ public class StartTransServlet extends HttpServlet
                     }
                 }
                 if (new File(newTmpDir + "out//" + fileNameSufx + "." + outFormat).exists())
-                    fileNameSufx = randomString();
+                    fileNameSufx = CommonFunctions.randomString();
                 StepMeta outputStep = getFileStepMeta("output", newTmpDir + "out//" + fileNameSufx, outFormat);
                 transMeta.addStep(outputStep);
                 srsToOutputHop.setToStep(outputStep);
@@ -294,7 +224,7 @@ public class StartTransServlet extends HttpServlet
         } catch (Exception e)
         {
         }
-        compressFiles(newTmpDir);
+        CommonFunctions.compressFiles(newTmpDir, errorsHandler);
         if (errorsHandler.count() == 0)
         {
             response.setContentType("application/x-please-download-me");
@@ -307,7 +237,7 @@ public class StartTransServlet extends HttpServlet
             out_file.close();
         } else
             errorsHandler.print();
-        deleteDirectory(new File(newTmpDir));
+        CommonFunctions.deleteDirectory(new File(newTmpDir));
     }
 
     public String toString()
