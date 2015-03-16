@@ -63,12 +63,14 @@ public class StartTransServlet extends HttpServlet
     private static Map<String, String[]> fileMetaClasses = new HashMap<String, String[]>()
     {
         {
-            put("gml", new String[] {"org.pentaho.di.trans.steps.gmlfileinput.GMLFileInputMeta",
-                    "org.pentaho.di.trans.steps.gmlfileoutput.GMLFileOutputMeta"});
+            put("gml", new String[] {"org.pentaho.di.trans.steps.ogrfileinput.OGRFileInputMeta",
+                    "org.pentaho.di.trans.steps.ogrfileoutput.OGRFileOutputMeta"});
             put("shp", new String[] {"org.pentaho.di.trans.steps.gisfileinput.GISFileInputMeta",
                     "org.pentaho.di.trans.steps.gisfileoutput.GISFileOutputMeta"});
-            put("kml", new String[] {"org.pentaho.di.trans.steps.kmlfileinput.KMLFileInputMeta",
-                    "org.pentaho.di.trans.steps.kmlfileoutput.KMLFileOutputMeta"});
+            put("kml", new String[] {"org.pentaho.di.trans.steps.ogrfileinput.OGRFileInputMeta",
+                    "org.pentaho.di.trans.steps.ogrfileoutput.OGRFileOutputMeta"});
+            put("tab", new String[] {"org.pentaho.di.trans.steps.ogrfileinput.OGRFileInputMeta",
+                    "org.pentaho.di.trans.steps.ogrfileoutput.OGRFileOutputMeta"});
         }
     };
 
@@ -82,13 +84,24 @@ public class StartTransServlet extends HttpServlet
         {
             Class<?> fileMetaClass = Class.forName(fileMetaClasses.get(format)[stepName == "input" ? 0 : 1]);
             Object fileMeta = fileMetaClass.newInstance();
-            Method setFileNameMethod = fileMetaClass.getDeclaredMethod("setFileName", String.class);
-            setFileNameMethod.invoke(fileMeta, new Object[] {fileName + "." + format});
-            if (format == "shp")
+            String setFileNameMethodTitle = "setSource";
+            if (format.equals("shp"))
             {
                 Method setCharsetMethod = fileMetaClass.getDeclaredMethod("setGisFileCharset", String.class);
                 setCharsetMethod.invoke(fileMeta, new Object[] {Config.defGisCharset});
+                setFileNameMethodTitle = "setFileName";
+            } else
+            {
+                Method setIsFileSourceMethod = fileMetaClass.getDeclaredMethod("setIsFileSource", boolean.class);
+                setIsFileSourceMethod.invoke(fileMeta, new Object[] {true});
+                if (stepName == "output")
+                {
+                    Method setOgrOutputFormat = fileMetaClass.getDeclaredMethod("setOgrOutputFormat", String.class);
+                    setOgrOutputFormat.invoke(fileMeta, new Object[] {Config.orgDataFormats.get(format)});
+                }
             }
+            Method setFileNameMethod = fileMetaClass.getDeclaredMethod(setFileNameMethodTitle, String.class);
+            setFileNameMethod.invoke(fileMeta, new Object[] {fileName + "." + format});
             return new StepMeta(stepName, (StepMetaInterface) fileMeta);
         } catch (Exception e)
         {
@@ -102,7 +115,6 @@ public class StartTransServlet extends HttpServlet
     {
         if (!request.getContextPath().equals(CONTEXT_PATH))
             return;
-
         if (log.isDebug())
             log.logDebug(toString(), Messages.getString("StartTransServlet.Log.StartTransRequested"));
 
