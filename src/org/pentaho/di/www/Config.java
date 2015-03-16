@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class Config
 {
-    public static final String[] transNames = {"Перепроектирование"};
+    public static final String[] transNames = {"РџРµСЂРµРїСЂРѕРµРєС‚РёСЂРѕРІР°РЅРёРµ"};
     public static final String[] transFiles = {"srs.ktr"};
     public static final String[] basicFormats = {"gml", "shp", "kml", "tab"};
     public static final Map<String, String> orgDataFormats = new HashMap()
