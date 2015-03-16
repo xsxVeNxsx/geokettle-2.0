@@ -18,7 +18,7 @@ import org.geotools.data.wfs.WFSDataStoreFactory;
 
 public class WFSClient
 {
-    public static boolean LoadFeature(URL url, String fileDir) throws UnsupportedEncodingException
+    public static boolean loadFeature(URL url, String fileDir) throws UnsupportedEncodingException
     {
         Map<String, String> query_pairs = new HashMap<String, String>();
         String query = url.getQuery();

@@ -145,7 +145,7 @@ public class StartTransServlet extends HttpServlet
         }
         if (params.get("in_type").equals("wfs"))
         {
-            WFSClient.LoadFeature(new URL(params.get("input")), newTmpDir);
+            WFSClient.loadFeature(new URL(params.get("input")), newTmpDir);
             inFilesNames.add(Config.WFSTmpInFileName);
         }
         CommonFunctions.validateParams(params, inFilesNames, errorsHandler);
